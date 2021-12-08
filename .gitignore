@@ -5,3 +5,5 @@
 /dump/
 /proto.gen/
 iss.sql
+*_pb2.py
+/data/

@@ -1,10 +1,8 @@
 from tools import readURLorFile
 from time import time_ns
 
-import securities_pb2
-import stockbonds_security_pb2
-import stockbonds_marketdata_pb2
-import stockbonds_yield_pb2
+import iss_types_pb2
+import universal_pb2
 
 def pack(name, columns, data, itemPB2, packPB2):
     st = {
@@ -17,13 +15,20 @@ def pack(name, columns, data, itemPB2, packPB2):
         'cnt': 0
     }
     pack = packPB2()
+    item = itemPB2()
 
     i=1
     for row in data:
-        item = itemPB2()
+        item.Clear()
         for col in range(len(columns)):
-            if row[col] is not None and hasattr(item, columns[col]):
-                setattr(item, columns[col], row[col])
+            if row[col] is not None and hasattr(item, columns[col].upper()):
+                if columns[col].upper() in ('FACEUNIT', 'CURRENCYID'):
+                    setattr(item, columns[col].upper(), getattr(iss_types_pb2.CurrencyEnum, row[col]))
+                elif columns[col].upper() in ('BOARDID',):
+                    setattr(item, columns[col].upper(), getattr(iss_types_pb2.BoardsEnum, row[col]))
+                else:
+                    #print('%s -> %s' %(columns[col].upper(), str(row[col])))
+                    setattr(item, columns[col].upper(), row[col])
 
         pack.pack.append(item)
         bT = time_ns()
@@ -58,8 +63,8 @@ Info = readURLorFile(URL_PREF + 'iss/engines/stock/markets/bonds/securities.json
                         params={'iss.meta': 'off'})
 
 pack('securities', Info['securities']['columns'], Info['securities']['data'],
-     stockbonds_security_pb2.StockBondsSecurity, securities_pb2.StockBondsSecurities)
+     universal_pb2.UniversalSecurity, universal_pb2.UniversalSecuritySet)
 pack('marketdata', Info['marketdata']['columns'], Info['marketdata']['data'],
-     stockbonds_marketdata_pb2.StockBondsMarketdata, securities_pb2.StockBondsMarketdatas)
+     universal_pb2.UniversalMarketdata, universal_pb2.UniversalMarketdataSet)
 pack('marketdata_yields', Info['marketdata_yields']['columns'], Info['marketdata_yields']['data'],
-     stockbonds_yield_pb2.StockBondsYield, securities_pb2.StockBondsYields)
+     universal_pb2.UniversalYield, universal_pb2.UniversalYieldSet)

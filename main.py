@@ -74,6 +74,7 @@ def insertRow(file, tbl, cols, rows):
 
 
 URL_PREF = 'http://iss.moex.com/'
+accum = {}
 with open('iss.sql', 'w') as f_sql:
     ISS = readURLorFile(URL_PREF + 'iss.json', 'iss.json')
 
@@ -114,19 +115,43 @@ with open('iss.sql', 'w') as f_sql:
                                 params={'iss.data': 'off'})
 
         pref = '%s%s' % (e_m[2].capitalize(), e_m[4].capitalize())
-        genProtoFile(
-            '%s%s' % (e_m[2], e_m[4]),
-            (
-            (pref, 'Security', 'securities'), (pref, 'Marketdata', 'marketdata'), (pref, 'Yield', 'marketdata_yields')),
-            secInfo, dirName='proto.gen', genSet=True
-        )
+        accum = genProtoFile('%s%s' % (e_m[2], e_m[4]),
+                     ((pref, 'Security', 'securities'), (pref, 'Marketdata', 'marketdata'),
+                      (pref, 'Yield', 'marketdata_yields')),
+                     secInfo, dirName='proto.gen', genSet=True, accum=accum
+                     )
     genProtoFile(
         'dataversion',
         (('', 'Dataversion', 'dataversion'),),
         secInfo, dirName='proto.gen'
     )
 
+    for blk in accum:
+        accum[blk]['metadata'] = sorted(accum[blk]['accum'].items(), key=lambda item: float(item[1]['row']) / float(item[1]['cnt']))
+    genProtoFile('universal',
+                 (('Universal', 'Security', 'securities'), ('Universal', 'Marketdata', 'marketdata'),
+                  ('Universal', 'Yield', 'marketdata_yields')),
+                 accum, dirName='proto.gen', genSet=True
+                 )
+
     insertRow(f_sql, 'columns', colInfo['marketdata']['metadata'], list(cols.values()))
 
     createTable(f_sql, 'eng_mrt_blk_col', E_M_C['metadata'])
     insertRow(f_sql, 'eng_mrt_blk_col', E_M_C['columns'], E_M_C['data'])
+
+with open(os.path.join('proto.gen', 'iss-types.proto'), 'w') as f_p:
+    f_p.write('syntax = "proto3";\n')
+
+    f_p.write('\nenum CurrencyEnum {\n')
+    i = 0
+    for cur in CURRENCY:
+        f_p.write('\t%s = %d;\t//%s\n' % (cur[1], i, cur[2]))
+        i += 1
+    f_p.write('}\n')
+
+    f_p.write('\nenum BoardsEnum {\n')
+    i = 0
+    for row in ISS['boards']['data']:
+        f_p.write('\t%s = %d;\t//%s\n' % (row[4], i, row[5]))
+        i += 1
+    f_p.write('}\n')
