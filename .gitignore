@@ -1,0 +1,7 @@
+# Project exclude paths
+/venv/
+/__pycache__/
+/.idea/
+/dump/
+/proto.gen/
+iss.sql
