@@ -13,6 +13,7 @@ CURRENCY = (
     (9, 'KZT', 'Казахстанский тенге'),
     (10, 'SLV', 'Серебро'),
     (11, 'SUR', 'руб.'),
+    (11, 'RUB', 'руб.'),
     (12, 'TRY', 'Турецкая лира'),
     (13, 'UAH', 'Украинская гривна'),
     (14, 'USD', 'долл. США'),
@@ -155,3 +156,15 @@ with open(os.path.join('proto.gen', 'iss-types.proto'), 'w') as f_p:
         f_p.write('\t%s = %d;\t//%s\n' % (row[4], i, row[5]))
         i += 1
     f_p.write('}\n')
+
+    f_p.write('''
+message issDataTime {
+	enum dtType {
+		TIME = 0;
+		DATE = 1;
+		DATETIME = 2;
+	}
+	dtType type = 1;
+	sint64 data = 2; 
+}
+''')

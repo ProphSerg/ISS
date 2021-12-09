@@ -1,47 +1,68 @@
 import requests
 import json
 import os.path
+from time import time_ns
 
 
-def readURLorFile(url, file, dirName='dump', useCache=True, **kwargs):
+def readURLorFile(url, file, dirName='dump', useCache=True, stat=None, **kwargs):
+    file = os.path.join(dirName, file)
     if useCache:
         if not os.path.isdir(dirName):
             os.mkdir(dirName)
-        file = os.path.join(dirName, file)
         if os.path.isfile(file):
             with open(file, 'r') as f:
                 return json.load(f)
 
+    t1 = time_ns()
     req = requests.get(url, **kwargs)
+    t2 = time_ns()
     jreq = req.json()
+    t3 = time_ns()
+    if stat is not None:
+        stat.update({
+            'get': t2 - t1,
+            'json': t3 - t2,
+            'len': len(req.content),
+        })
     with open(file, 'w') as f:
         json.dump(jreq, f)
     return jreq
 
+mapType = {
+    'string': 'google.protobuf.StringValue',
+    'int32': 'google.protobuf.Int32Value',
+    'int64': 'google.protobuf.Int64Value',
+    'double': 'google.protobuf.DoubleValue',
+    'time': 'issDataTime',
+    'date': 'issDataTime',
+    'datetime': 'issDataTime',
+}
+priorityType = (
+    'google.protobuf.StringValue',
+    'google.protobuf.Int32Value',
+    'google.protobuf.Int64Value',
+    'google.protobuf.FloatValue',
+    'google.protobuf.DoubleValue',
+    'issDataTime',
+    'time',
+    'date',
+    'datetime',
+    'BoardsEnum',
+    'CurrencyEnum'
+)
+
 def protoType(inName, inType):
-    if inType in ('time', 'date', 'datetime'):
-        return 'string'
-    elif inName in ('FACEUNIT', 'CURRENCYID'):
+    if inName in ('FACEUNIT', 'CURRENCYID'):
         return 'CurrencyEnum'
     elif inName in ('BOARDID', ):
         return 'BoardsEnum'
-    return inType
+    return mapType[inType] if inType in mapType else inType
 
 def getMaxType(types):
-    t = 'string'
-    if 'int32' in types:
-        t = 'int32'
-    if 'int64' in types:
-        t = 'int64'
-    if 'double' in types:
-        t = 'double'
-    if 'time' in types:
-        t = 'time'
-    if 'date' in types:
-        t = 'date'
-    if 'datetime' in types:
-        t = 'datetime'
-    return t
+    t = 0
+    for i in types:
+        t = max(t, priorityType.index(i))
+    return priorityType[t]
 
 def getAccum(accum, block, name, type, row):
     if block not in accum:
@@ -72,8 +93,9 @@ def genProtoFile(fileName, blocks, info, dirName='proto', genSet=False, accum=No
         os.mkdir(dirName)
 
     with open(os.path.join(dirName, fileName + '.proto'), 'w') as f_p:
-        f_p.write('syntax = "proto3";\n')
-        f_p.write('\nimport "iss-types.proto";\n')
+        f_p.write('syntax = "proto3";\n\n')
+        f_p.write('import "google/protobuf/wrappers.proto";\n')
+        f_p.write('import "iss-types.proto";\n')
 
         for blk in blocks:
             f_p.write('\nmessage %s%s {\n' % (blk[0], blk[1]))
