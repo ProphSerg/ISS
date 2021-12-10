@@ -3,6 +3,29 @@ import json
 import os.path
 from time import time_ns
 
+def initStat(stat):
+    stat.update({
+        'minT': 9999999999, 'maxT': 0, 'sumT': 0,
+        'minL': 9999999999, 'maxL': 0, 'sumL': 0,
+        'cnt': 0
+    })
+
+def updateStat(statistic, name, deltaT, size = 0):
+    if name not in statistic:
+        statistic[name] = {}
+        initStat(statistic[name])
+    stat = statistic[name]
+    deltaT /= 1e6
+    stat.update({
+        'minT': min(stat['minT'], deltaT),
+        'maxT': max(stat['maxT'], deltaT),
+        'sumT': stat['sumT'] + deltaT,
+        'minL': min(stat['minL'], size),
+        'maxL': max(stat['maxL'], size),
+        'sumL': stat['sumL'] + size,
+        'cnt': stat['cnt'] + 1
+    })
+
 
 def readURLorFile(url, file, dirName='dump', useCache=True, stat=None, **kwargs):
     file = os.path.join(dirName, file)
@@ -19,11 +42,9 @@ def readURLorFile(url, file, dirName='dump', useCache=True, stat=None, **kwargs)
     jreq = req.json()
     t3 = time_ns()
     if stat is not None:
-        stat.update({
-            'get': t2 - t1,
-            'json': t3 - t2,
-            'len': len(req.content),
-        })
+        updateStat(stat, 'get', t2 - t1, len(req.content))
+        updateStat(stat, 'json', t3 - t2, len(jreq))
+
     with open(file, 'w') as f:
         json.dump(jreq, f)
     return jreq
@@ -33,9 +54,9 @@ mapType = {
     'int32': 'google.protobuf.Int32Value',
     'int64': 'google.protobuf.Int64Value',
     'double': 'google.protobuf.DoubleValue',
-    'time': 'issDataTime',
-    'date': 'issDataTime',
-    'datetime': 'issDataTime',
+    'time': 'google.protobuf.StringValue',
+    'date': 'google.protobuf.StringValue',
+    'datetime': 'google.protobuf.StringValue',
 }
 priorityType = (
     'google.protobuf.StringValue',
@@ -52,10 +73,12 @@ priorityType = (
 )
 
 def protoType(inName, inType):
+    '''
     if inName in ('FACEUNIT', 'CURRENCYID'):
         return 'CurrencyEnum'
     elif inName in ('BOARDID', ):
         return 'BoardsEnum'
+    '''
     return mapType[inType] if inType in mapType else inType
 
 def getMaxType(types):
@@ -95,7 +118,7 @@ def genProtoFile(fileName, blocks, info, dirName='proto', genSet=False, accum=No
     with open(os.path.join(dirName, fileName + '.proto'), 'w') as f_p:
         f_p.write('syntax = "proto3";\n\n')
         f_p.write('import "google/protobuf/wrappers.proto";\n')
-        f_p.write('import "iss-types.proto";\n')
+        #f_p.write('import "iss-types.proto";\n')
 
         for blk in blocks:
             f_p.write('\nmessage %s%s {\n' % (blk[0], blk[1]))
